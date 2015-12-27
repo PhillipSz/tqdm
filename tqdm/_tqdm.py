@@ -243,7 +243,7 @@ class tqdm(object):
                  maxinterval=10.0, miniters=None, ascii=None,
                  disable=False, unit='it', unit_scale=False,
                  dynamic_ncols=False, smoothing=0.3, nested=False,
-                 bar_format=None, initial=0, gui=False):
+                 bar_format=None, initial=0, position=0, gui=False):
         """
         Parameters
         ----------
@@ -381,6 +381,7 @@ class tqdm(object):
         # not overwrite the outer progress bar
         self.nested = nested
         self.bar_format = bar_format
+        self.pos = position
 
         # Init the iterations counters
         self.last_print_n = initial
@@ -392,9 +393,13 @@ class tqdm(object):
             if not disable:
                 if self.nested:
                     self.fp.write('\n')
+                if self.pos:
+                    self.moveto(self.pos)
                 self.sp(format_meter(self.n, total, 0,
                         (dynamic_ncols(file) if dynamic_ncols else ncols),
                         self.desc, ascii, unit, unit_scale, None, bar_format))
+                if self.pos:
+                    self.moveto(-self.pos)
 
         # Init the time counter
         self.start_t = self.last_print_t = time()
@@ -437,6 +442,7 @@ class tqdm(object):
             smoothing = self.smoothing
             avg_rate = self.avg_rate
             bar_format = self.bar_format
+            pos = self.pos
 
             try:
                 sp = self.sp
@@ -463,12 +469,19 @@ class tqdm(object):
                                 else smoothing * delta_it / delta_t + \
                                 (1 - smoothing) * avg_rate
 
+                        if pos:
+                            self.fp.write('\n' * pos + _term_move_up() * -pos)
+
+                        # Printing the bar's update
                         sp(format_meter(
                             n, self.total, elapsed,
                             (dynamic_ncols(self.fp) if dynamic_ncols
                              else ncols),
                             self.desc, ascii, unit, unit_scale, avg_rate,
                             bar_format))
+
+                        if pos:
+                            self.fp.write('\n' * -pos + _term_move_up() * pos)
 
                         # If no `miniters` was specified, adjust automatically
                         # to the maximum iteration rate seen so far.
@@ -540,12 +553,19 @@ class tqdm(object):
                     raise DeprecationWarning('Please use tqdm_gui(...)'
                                              ' instead of tqdm(..., gui=True)')
 
+                if self.pos:
+                    self.moveto(self.pos)
+
+                # Print bar's update
                 self.sp(format_meter(
                     self.n, self.total, elapsed,
                     (self.dynamic_ncols(self.fp) if self.dynamic_ncols
                      else self.ncols),
                     self.desc, self.ascii, self.unit, self.unit_scale,
                     self.avg_rate, self.bar_format))
+
+                if self.pos:
+                    self.moveto(-self.pos)
 
                 # If no `miniters` was specified, adjust automatically to the
                 # maximum iteration rate seen so far.
@@ -575,6 +595,9 @@ class tqdm(object):
         if self.disable:
             return
 
+        if self.pos:
+            self.moveto(self.pos)
+
         if self.leave:
             if self.last_print_n < self.n:
                 cur_t = time()
@@ -590,6 +613,11 @@ class tqdm(object):
             self.sp('')  # clear up last bar
             self.fp.write('\r' + _term_move_up() if self.nested else '\r')
 
+        if self.pos:
+            self.moveto(-self.pos)
+            if self.leave:
+                self.moveto(-1)
+
     def unpause(self):
         """
         Restart tqdm timer from last print time.
@@ -603,6 +631,9 @@ class tqdm(object):
         Set/modify description of the progress bar.
         """
         self.desc = desc + ': ' if desc else ''
+
+    def moveto(self, n):
+        self.fp.write('\n' * n + _term_move_up() * -n)
 
 
 def trange(*args, **kwargs):

@@ -767,7 +767,7 @@ def test_position():
     our_file.seek(0)
     out = our_file.read()
     res = [m[0] for m in RE_pos.findall(out)]
-    assert res == [u'\rpos0 bar:   0%',
+    assert res == ['\rpos0 bar:   0%',
                    '\n\rpos1 bar:   0%',
                    '\x1b[A\n\n\rpos2 bar:   0%',
                    '\x1b[A\x1b[A\n\n\rpos2 bar:  50%',
@@ -812,7 +812,7 @@ def test_position():
     our_file.seek(0)
     out = our_file.read()
     res = [m[0] for m in RE_pos.findall(out)]
-    assert res == [u'\rpos0 bar:   0%',
+    assert res == ['\rpos0 bar:   0%',
                    '\n\rpos1 bar:   0%',
                    '\x1b[A\n\n\rpos2 bar:   0%',
                    '\x1b[A\x1b[A\rpos0 bar:  50%',

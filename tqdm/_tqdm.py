@@ -312,6 +312,9 @@ class tqdm(object):
         initial : int, optional
             The initial counter value. Useful when restarting a progress
             bar [default: 0].
+        position  : int, optional
+            Specify the line offset to print this bar. Useful to manage
+            multiple bars at once (eg, from threads).
         gui  : bool, optional
             WARNING: internal parameter - do not use.
             Use tqdm_gui(...) instead. If set, will attempt to use

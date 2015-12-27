@@ -226,7 +226,8 @@ def StatusPrinter(file):
 
     def print_status(s):
         len_s = len(s)
-        fp.write('\r' + s + (' ' * max(last_printed_len[0] - len_s, 0)))
+        fp.write(_unicode('\r' + s + (' ' * max(last_printed_len[0] - len_s,
+                                                0))))
         fp.flush()
         last_printed_len[0] = len_s
     return print_status
@@ -238,12 +239,23 @@ class tqdm(object):
     like the original iterable, but prints a dynamically updating
     progressbar every time a value is requested.
     """
+    n_instances = 0
+
+    @classmethod
+    def _incr_instances(cls):
+        cls.n_instances += 1
+        return cls.n_instances
+
+    @classmethod
+    def _decr_instances(cls):
+        cls.n_instances -= 1
+
     def __init__(self, iterable=None, desc=None, total=None, leave=False,
                  file=sys.stderr, ncols=None, mininterval=0.1,
                  maxinterval=10.0, miniters=None, ascii=None,
                  disable=False, unit='it', unit_scale=False,
                  dynamic_ncols=False, smoothing=0.3, nested=False,
-                 bar_format=None, initial=0, position=0, gui=False):
+                 bar_format=None, initial=0, position=None, gui=False):
         """
         Parameters
         ----------
@@ -313,8 +325,8 @@ class tqdm(object):
             The initial counter value. Useful when restarting a progress
             bar [default: 0].
         position  : int, optional
-            Specify the line offset to print this bar. Useful to manage
-            multiple bars at once (eg, from threads).
+            Specify the line offset to print this bar [default: 0].
+            Useful to manage multiple bars at once (eg, from threads).
         gui  : bool, optional
             WARNING: internal parameter - do not use.
             Use tqdm_gui(...) instead. If set, will attempt to use
@@ -324,6 +336,11 @@ class tqdm(object):
         -------
         out  : decorated iterator.
         """
+        if disable:
+            self.iterable = iterable
+            self.disable = disable
+            return
+
         # Preprocess the arguments
         if total is None and iterable is not None:
             try:
@@ -384,7 +401,8 @@ class tqdm(object):
         # not overwrite the outer progress bar
         self.nested = nested
         self.bar_format = bar_format
-        self.pos = position
+        self.pos = self._incr_instances() - 1 if position is None else position
+        self.closed = False
 
         # Init the iterations counters
         self.last_print_n = initial
@@ -394,10 +412,10 @@ class tqdm(object):
             # Initialize the screen printer
             self.sp = StatusPrinter(self.fp)
             if not disable:
-                if self.nested:
-                    self.fp.write('\n')
                 if self.pos:
                     self.moveto(self.pos)
+                elif self.nested:
+                    self.fp.write('\n')
                 self.sp(format_meter(self.n, total, 0,
                         (dynamic_ncols(file) if dynamic_ncols else ncols),
                         self.desc, ascii, unit, unit_scale, None, bar_format))
@@ -416,6 +434,32 @@ class tqdm(object):
     def __exit__(self, *exc):
         self.close()
         return False
+
+    def __del__(self):
+        self.close()
+
+    def __repr__(self):
+        return format_meter(self.n, self.total, time() - self.last_print_t,
+                            self.ncols, self.desc, self.ascii, self.unit,
+                            self.unit_scale, self.avg_rate, self.bar_format)
+
+    def __lt__(self, other):
+        return self.pos < other.pos
+
+    def __le__(self, other):
+        return self.pos <= other.pos
+
+    def __eq__(self, other):
+        return self.pos == other.pos
+
+    def __ne__(self, other):
+        return self.pos != other.pos
+
+    def __gt__(self, other):
+        return self.pos > other.pos
+
+    def __ge__(self, other):
+        return self.pos >= other.pos
 
     def __iter__(self):
         ''' Backward-compatibility to use: for x in tqdm(iterable) '''
@@ -599,23 +643,45 @@ class tqdm(object):
         if self.disable:
             return
 
+        # Prevent multiple closures
+        if self.closed:
+            return
+        self.closed = True
+
+        self._decr_instances()
+
         if self.pos:
-            self.moveto(self.pos)
+            try:
+                self.moveto(self.pos)
+            except ValueError as e:
+                if 'closed' in e.message:
+                    return
 
         if self.leave:
             if self.last_print_n < self.n:
                 cur_t = time()
                 # stats for overall rate (no weighted average)
-                self.sp(format_meter(
+                stats = format_meter(
                     self.n, self.total, cur_t - self.start_t,
                     (self.dynamic_ncols(self.fp) if self.dynamic_ncols
                      else self.ncols),
                     self.desc, self.ascii, self.unit, self.unit_scale, None,
-                    self.bar_format))
-            self.fp.write('\r' + _term_move_up() if self.nested else '\n')
+                    self.bar_format)
+                try:
+                    self.sp(stats)
+                except ValueError as e:
+                    if 'closed' in e.message:
+                        return
+            self.fp.write('\r' + _term_move_up()
+                          if (self.nested and not self.pos) else '\n')
         else:
-            self.sp('')  # clear up last bar
-            self.fp.write('\r' + _term_move_up() if self.nested else '\r')
+            try:
+                self.sp('')  # clear up last bar
+            except ValueError as e:
+                if 'closed' in e.message:
+                    return
+            self.fp.write(_unicode('\r' + _term_move_up()
+                                   if (self.nested and not self.pos) else '\r'))
 
         if self.pos:
             self.moveto(-self.pos)
@@ -637,7 +703,7 @@ class tqdm(object):
         self.desc = desc + ': ' if desc else ''
 
     def moveto(self, n):
-        self.fp.write('\n' * n + _term_move_up() * -n)
+        self.fp.write(_unicode('\n' * n + _term_move_up() * -n))
 
 
 def trange(*args, **kwargs):

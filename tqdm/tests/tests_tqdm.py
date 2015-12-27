@@ -412,8 +412,8 @@ def test_ascii():
     """ Test ascii/unicode bar """
     # Test ascii autodetection
     with closing(StringIO()) as our_file:
-        t = tqdm(total=10, file=our_file, ascii=None)
-        assert t.ascii  # TODO: this may fail in the future
+        with tqdm(total=10, file=our_file, ascii=None) as t:
+            assert t.ascii  # TODO: this may fail in the future
 
     # Test ascii bar
     with closing(StringIO()) as our_file:
@@ -429,9 +429,9 @@ def test_ascii():
     # Test unicode bar
     from io import StringIO as uIO  # supports unicode strings
     with closing(uIO()) as our_file:
-        t = tqdm(total=15, file=our_file, ascii=False, mininterval=0)
-        for _ in _range(3):
-            t.update()
+        with tqdm(total=15, file=our_file, ascii=False, mininterval=0) as t:
+            for _ in _range(3):
+                t.update()
         our_file.seek(0)
         res = our_file.read().strip("\r").split("\r")
         assert "7%|\u258b" in res[1]
@@ -457,34 +457,40 @@ def test_update():
 
 
 def test_close():
-    """ Test manual creation and closure """
+    """ Test manual creation and closure and n_instances """
     # With `leave` option
     with closing(StringIO()) as our_file:
         progressbar = tqdm(total=3, file=our_file, miniters=10, leave=True)
         progressbar.update(3)
         our_file.seek(0)
         assert '| 3/3 ' not in our_file.read()  # Should be blank
+        assert tqdm.n_instances == 1
         progressbar.close()
         our_file.seek(0)
         assert '| 3/3 ' in our_file.read()
+        assert tqdm.n_instances == 0
 
     # Without `leave` option
     with closing(StringIO()) as our_file:
         progressbar = tqdm(total=3, file=our_file, miniters=10)
+        assert tqdm.n_instances == 1
         progressbar.update(3)
         progressbar.close()
         our_file.seek(0)
         assert '| 3/3 ' not in our_file.read()  # Should be blank
+    assert tqdm.n_instances == 0
 
     # With all updates
     with closing(StringIO()) as our_file:
         with tqdm(total=3, file=our_file, miniters=0, mininterval=0,
                   leave=True) as progressbar:
+            assert tqdm.n_instances == 1
             progressbar.update(3)
             our_file.seek(0)
             res = our_file.read()
             assert '| 3/3 ' in res  # Should be blank
         # close() called
+        assert tqdm.n_instances == 0
         our_file.seek(0)
         try:
             assert res + '\n' == our_file.read()
@@ -497,6 +503,8 @@ def test_close():
 
 def test_smoothing():
     """ Test exponential weighted average smoothing """
+
+    assert tqdm.n_instances == 0
 
     # -- Test disabling smoothing
     with closing(StringIO()) as our_file:
@@ -533,8 +541,10 @@ def test_smoothing():
     # 2nd case: use max smoothing (= instant rate)
     with closing(StringIO()) as our_file2:
         with closing(StringIO()) as our_file:
+            print 'foo >>>>>>>>'
             t = tqdm(_range(3), file=our_file2, smoothing=1, leave=True,
                      miniters=1, mininterval=0)
+            print 'bar <<<<<<<<'
             for i in tqdm(_range(3), file=our_file, smoothing=1, leave=True,
                           miniters=1, mininterval=0):
                 if i == 0:

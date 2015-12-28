@@ -37,9 +37,12 @@ except NameError:
 RE_rate = re.compile(r'(\d+\.\d+)it/s')
 
 
-def get_bar(all_bars, i):
+def get_bar(all_bars, i, seek_read=True):
     """ Get a specific update from a whole bar traceback """
-    return all_bars.strip('\r').split('\r')[i]
+    if seek_read:
+        all_bars.seek(0)
+    return (all_bars.read() if seek_read else
+            all_bars).strip('\r').split('\r')[i]
 
 
 def progressbar_rate(bar_str):
@@ -114,7 +117,8 @@ def test_all_defaults():
     for _ in progressbar:
         pass
     import sys
-    sys.stderr.write('tests_tqdm.test_all_defaults ... ')
+    # restore stdout/stderr output for `nosetest` interface
+    sys.stderr.write('Test default kwargs ... ')
 
 
 def test_iterate_over_csv_rows():
@@ -212,12 +216,10 @@ def test_max_interval():
                 t2.update(smallstep)
                 sleep(1e-5)
 
-            our_file.seek(0)
             our_file2.seek(0)
-            out = our_file.read()
-            out2 = our_file2.read()
-            assert "25%" not in out
-            assert "25%" not in out2
+            assert "25%" not in our_file2.read()
+        our_file.seek(0)
+        assert "25%" not in our_file.read()
 
     # Test with maxinterval effect
     with closing(StringIO()) as our_file:
@@ -232,8 +234,7 @@ def test_max_interval():
             sleep(1e-2)
 
         our_file.seek(0)
-        out = our_file.read()
-        assert "25%" in out
+        assert "25%" in our_file.read()
 
     # Test iteration based tqdm with maxinterval effect
     with closing(StringIO()) as our_file:
@@ -245,8 +246,7 @@ def test_max_interval():
                 break
 
         our_file.seek(0)
-        out = our_file.read()
-        assert "15%" in out
+        assert "15%" in our_file.read()
 
 
 def test_min_iters():
@@ -266,7 +266,7 @@ def test_min_iters():
 
 
 def test_dynamic_min_iters():
-    """ Test purely dynamic miniters """
+    """ Test purely dynamic miniters (and manual updates and __del__) """
     with closing(StringIO()) as our_file:
         total = 10
         t = tqdm(total=total, file=our_file, miniters=None, mininterval=0,
@@ -283,12 +283,12 @@ def test_dynamic_min_iters():
 
         our_file.seek(0)
         out = our_file.read()
-        assert t.dynamic_miniters
-        assert '  0%|          | 0/10 [00:00<' in out
-        assert '40%' in out
-        assert '50%' not in out
-        assert '60%' not in out
-        assert '70%' in out
+    assert t.dynamic_miniters
+    assert '  0%|          | 0/10 [00:00<' in out
+    assert '40%' in out
+    assert '50%' not in out
+    assert '60%' not in out
+    assert '70%' in out
 
     with closing(StringIO()) as our_file:
         t = tqdm(_range(10), file=our_file, miniters=None, mininterval=None)
@@ -336,15 +336,15 @@ def test_smoothed_dynamic_min_iters():
 
         our_file.seek(0)
         out = our_file.read()
-        assert t.dynamic_miniters
-        assert '  0%|          | 0/100 [00:00<' in out
-        assert '10%' in out
-        assert '14%' not in out
-        assert '18%' in out
-        assert '20%' not in out
-        assert '25%' in out
-        assert '30%' not in out
-        assert '32%' in out
+    assert t.dynamic_miniters
+    assert '  0%|          | 0/100 [00:00<' in out
+    assert '10%' in out
+    assert '14%' not in out
+    assert '18%' in out
+    assert '20%' not in out
+    assert '25%' in out
+    assert '30%' not in out
+    assert '32%' in out
 
 
 def test_smoothed_dynamic_min_iters_with_min_interval():
@@ -422,9 +422,9 @@ def test_ascii():
             pass
         our_file.seek(0)
         res = our_file.read().strip("\r").split("\r")
-        assert '7%|6' in res[1]
-        assert '13%|#3' in res[2]
-        assert '20%|##' in res[3]
+    assert '7%|6' in res[1]
+    assert '13%|#3' in res[2]
+    assert '20%|##' in res[3]
 
     # Test unicode bar
     from io import StringIO as uIO  # supports unicode strings
@@ -434,9 +434,9 @@ def test_ascii():
                 t.update()
         our_file.seek(0)
         res = our_file.read().strip("\r").split("\r")
-        assert "7%|\u258b" in res[1]
-        assert "13%|\u2588\u258e" in res[2]
-        assert "20%|\u2588\u2588" in res[3]
+    assert "7%|\u258b" in res[1]
+    assert "13%|\u2588\u258e" in res[2]
+    assert "20%|\u2588\u2588" in res[3]
 
 
 def test_update():
@@ -451,9 +451,9 @@ def test_update():
         progressbar.total = 4
         progressbar.update(-10)  # should default to +1
         our_file.seek(0)
-        assert '| 3/4 ' in our_file.read()
-        our_file.seek(0)
-        assert 'dynamically notify of 4 increments in total' in our_file.read()
+        res = our_file.read()
+    assert '| 3/4 ' in res
+    assert 'dynamically notify of 4 increments in total' in res
 
 
 def test_close():
@@ -466,22 +466,21 @@ def test_close():
         assert '| 3/3 ' not in our_file.read()  # Should be blank
         assert tqdm.n_instances == 1
         progressbar.close()
+        assert tqdm.n_instances == 0
         our_file.seek(0)
         assert '| 3/3 ' in our_file.read()
-        assert tqdm.n_instances == 0
 
     # Without `leave` option
     with closing(StringIO()) as our_file:
         progressbar = tqdm(total=3, file=our_file, miniters=10)
-        assert tqdm.n_instances == 1
         progressbar.update(3)
         progressbar.close()
         our_file.seek(0)
         assert '| 3/3 ' not in our_file.read()  # Should be blank
-    assert tqdm.n_instances == 0
 
     # With all updates
     with closing(StringIO()) as our_file:
+        assert tqdm.n_instances == 0
         with tqdm(total=3, file=our_file, miniters=0, mininterval=0,
                   leave=True) as progressbar:
             assert tqdm.n_instances == 1
@@ -532,11 +531,9 @@ def test_smoothing():
                     sleep(0.001)
                 t.update()
             # Get result for iter-based bar
-            our_file.seek(0)
-            a = progressbar_rate(get_bar(our_file.read(), 3))
+            a = progressbar_rate(get_bar(our_file, 3))
         # Get result for manually updated bar
-        our_file2.seek(0)
-        a2 = progressbar_rate(get_bar(our_file2.read(), 3))
+        a2 = progressbar_rate(get_bar(our_file2, 3))
 
     # 2nd case: use max smoothing (= instant rate)
     with closing(StringIO()) as our_file2:
@@ -555,11 +552,9 @@ def test_smoothing():
                     sleep(0.001)
                 t.update()
             # Get result for iter-based bar
-            our_file.seek(0)
-            b = progressbar_rate(get_bar(our_file.read(), 3))
+            b = progressbar_rate(get_bar(our_file, 3))
         # Get result for manually updated bar
-        our_file2.seek(0)
-        b2 = progressbar_rate(get_bar(our_file2.read(), 3))
+        b2 = progressbar_rate(get_bar(our_file2, 3))
 
     # 3rd case: use medium smoothing
     with closing(StringIO()) as our_file2:
@@ -574,11 +569,9 @@ def test_smoothing():
                     sleep(0.001)
                 t.update()
             # Get result for iter-based bar
-            our_file.seek(0)
-            c = progressbar_rate(get_bar(our_file.read(), 3))
+            c = progressbar_rate(get_bar(our_file, 3))
         # Get result for manually updated bar
-        our_file2.seek(0)
-        c2 = progressbar_rate(get_bar(our_file2.read(), 3))
+        c2 = progressbar_rate(get_bar(our_file2, 3))
 
     # Check that medium smoothing's rate is between no and max smoothing rates
     assert a < c < b
@@ -721,9 +714,10 @@ def test_bar_format():
     assert "\r  0%|          |0/2-0/20.0None?it/s00:00?\r" in out
 
     # Test unicode string auto conversion
-    bar_format = r'hello world'
-    t = tqdm(ascii=False, bar_format=bar_format)
-    assert isinstance(t.bar_format, _unicode)
+    with closing(StringIO()) as our_file:
+        bar_format = r'hello world'
+        t = tqdm(ascii=False, bar_format=bar_format, file=our_file)
+        assert isinstance(t.bar_format, _unicode)
 
 
 def test_unpause():
@@ -741,8 +735,8 @@ def test_unpause():
         sleep(0.01)
         t.update()
         t.close()
-        r_before = progressbar_rate(get_bar(our_file.getvalue(), 2))
-        r_after = progressbar_rate(get_bar(our_file.getvalue(), 3))
+        r_before = progressbar_rate(get_bar(our_file.getvalue(), 2, False))
+        r_after = progressbar_rate(get_bar(our_file.getvalue(), 3, False))
     assert abs(r_before - r_after) < 1  # TODO: replace equal when DiscreteTimer
 
 
@@ -837,12 +831,13 @@ def test_position():
 
 def test_set_description():
     """ Test set description """
-    t = tqdm(desc='Hello')
-    assert t.desc == 'Hello: '
-    t.set_description('World')
-    assert t.desc == 'World: '
-    t.set_description()
-    assert t.desc == ''
+    with closing(StringIO()) as our_file:
+        t = tqdm(desc='Hello', file=our_file)
+        assert t.desc == 'Hello: '
+        t.set_description('World')
+        assert t.desc == 'World: '
+        t.set_description()
+        assert t.desc == ''
 
 
 def test_no_gui():
@@ -853,8 +848,10 @@ def test_no_gui():
         assert not hasattr(t, "sp")
         try:
             t.update(1)
-        except DeprecationWarning:
-            pass
+        except DeprecationWarning as e:
+            if str(e) != ('Please use tqdm_gui(...) instead of'
+                          ' tqdm(..., gui=True)'):
+                raise
         else:
             raise DeprecationWarning('Should not allow manual gui=True without'
                                      ' overriding __iter__() and update()')
@@ -869,37 +866,36 @@ def test_no_gui():
             raise DeprecationWarning('Should not allow manual gui=True without'
                                      ' overriding __iter__() and update()')
 
-        assert not hasattr(t, "sp")
-        # TODO: fix this:
-        # try:
-        #     t.close()
-        # except AttributeError:
-        #     if "object has no attribute 'sp'" not in str(e):
-        #         raise
-        # else:
-        #     raise AttributeError("'sp' attribute should not exist in " +
-        #                          str(t))
+        t.close()
 
-        t2 = tqdm(total=1, gui=False, file=our_file)
-        assert hasattr(t2, "sp")
+        t = tqdm(total=1, gui=False, file=our_file)
+        assert hasattr(t, "sp")
 
 
 def test_cmp():
-    """ Tests comparison functions """
-    t0 = tqdm(total=10)
-    t1 = tqdm(total=10)
-    t2 = tqdm(total=10)
+    """ Test comparison functions """
+    with closing(StringIO()) as our_file:
+        t0 = tqdm(total=10, file=our_file)
+        t1 = tqdm(total=10, file=our_file)
+        t2 = tqdm(total=10, file=our_file)
 
-    assert t0 < t1
-    assert t2 >= t0
-    assert t0 <= t2
+        assert t0 < t1
+        assert t2 >= t0
+        assert t0 <= t2
 
-    t3 = tqdm(total=10)
-    t4 = tqdm(total=10)
-    t5 = tqdm(total=10)
-    t5.close()
-    t6 = tqdm(total=10)
+        t3 = tqdm(total=10, file=our_file)
+        t4 = tqdm(total=10, file=our_file)
+        t5 = tqdm(total=10, file=our_file)
+        t5.close()
+        t6 = tqdm(total=10, file=our_file)
 
-    assert t3 != t4
-    assert t3 > t2
-    assert t5 == t6
+        assert t3 != t4
+        assert t3 > t2
+        assert t5 == t6
+
+
+def test_repr():
+    """ Test representation """
+    with closing(StringIO()) as our_file:
+        t = tqdm(total=10, ascii=False, file=our_file)
+        assert str(t) == '  0%|          | 0/10 [00:00<?,  0.00it/s]'

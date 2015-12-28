@@ -401,7 +401,6 @@ class tqdm(object):
         # not overwrite the outer progress bar
         self.nested = nested
         self.bar_format = bar_format
-        self.pos = self._incr_instances() - 1 if position is None else position
         self.closed = False
 
         # Init the iterations counters
@@ -409,6 +408,8 @@ class tqdm(object):
         self.n = initial
 
         if not gui:
+            self.pos = self._incr_instances() - 1 \
+                if position is None else position
             # Initialize the screen printer
             self.sp = StatusPrinter(self.fp)
             if not disable:
@@ -489,11 +490,11 @@ class tqdm(object):
             smoothing = self.smoothing
             avg_rate = self.avg_rate
             bar_format = self.bar_format
-            pos = self.pos
             fp = self.fp
 
             try:
                 sp = self.sp
+                pos = self.pos
             except AttributeError:
                 raise DeprecationWarning('Please use tqdm_gui(...)'
                                          ' instead of tqdm(..., gui=True)')
@@ -597,7 +598,7 @@ class tqdm(object):
                         else self.smoothing * delta_it / delta_t + \
                         (1 - self.smoothing) * self.avg_rate
 
-                if not hasattr(self, "sp"):
+                if not (hasattr(self, "sp") and hasattr(self, "pos")):
                     raise DeprecationWarning('Please use tqdm_gui(...)'
                                              ' instead of tqdm(..., gui=True)')
 
@@ -649,6 +650,12 @@ class tqdm(object):
         self.closed = True
 
         self._decr_instances()
+
+        # only for unit testing
+        if not hasattr(self, "sp"):
+            # raise AttributeError("object has no attribute 'sp'")
+            # Fail silently since __del__() cannot throw errors properly
+            return
 
         try:
             self.fp.write(_unicode(''))

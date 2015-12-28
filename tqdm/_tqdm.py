@@ -653,7 +653,7 @@ class tqdm(object):
         try:
             self.fp.write(_unicode(''))
         except ValueError as e:
-            if 'closed' in e.message:
+            if 'closed' in str(e):
                 return
 
         if self.pos:

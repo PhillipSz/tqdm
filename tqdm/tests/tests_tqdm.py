@@ -869,8 +869,19 @@ def test_no_gui():
             raise DeprecationWarning('Should not allow manual gui=True without'
                                      ' overriding __iter__() and update()')
 
-        t = tqdm(total=1, gui=False, file=our_file)
-        assert hasattr(t, "sp")
+        assert not hasattr(t, "sp")
+        # TODO: fix this:
+        # try:
+        #     t.close()
+        # except AttributeError:
+        #     if "object has no attribute 'sp'" not in str(e):
+        #         raise
+        # else:
+        #     raise AttributeError("'sp' attribute should not exist in " +
+        #                          str(t))
+
+        t2 = tqdm(total=1, gui=False, file=our_file)
+        assert hasattr(t2, "sp")
 
 
 def test_cmp():

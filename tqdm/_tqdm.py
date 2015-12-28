@@ -650,12 +650,14 @@ class tqdm(object):
 
         self._decr_instances()
 
+        try:
+            self.fp.write(_unicode(''))
+        except ValueError as e:
+            if 'closed' in e.message:
+                return
+
         if self.pos:
-            try:
-                self.moveto(self.pos)
-            except ValueError as e:
-                if 'closed' in e.message:
-                    return
+            self.moveto(self.pos)
 
         if self.leave:
             if self.last_print_n < self.n:
@@ -667,19 +669,11 @@ class tqdm(object):
                      else self.ncols),
                     self.desc, self.ascii, self.unit, self.unit_scale, None,
                     self.bar_format)
-                try:
-                    self.sp(stats)
-                except ValueError as e:
-                    if 'closed' in e.message:
-                        return
+                self.sp(stats)
             self.fp.write('\r' + _term_move_up()
                           if (self.nested and not self.pos) else '\n')
         else:
-            try:
-                self.sp('')  # clear up last bar
-            except ValueError as e:
-                if 'closed' in e.message:
-                    return
+            self.sp('')  # clear up last bar
             self.fp.write(_unicode('\r' + _term_move_up()
                                    if (self.nested and not self.pos) else '\r'))
 

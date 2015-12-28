@@ -541,10 +541,12 @@ def test_smoothing():
     # 2nd case: use max smoothing (= instant rate)
     with closing(StringIO()) as our_file2:
         with closing(StringIO()) as our_file:
-            print 'foo >>>>>>>>'
+            t.close()
+            # t.close() is required to stop a new instance being created before
+            # the old one dies
             t = tqdm(_range(3), file=our_file2, smoothing=1, leave=True,
                      miniters=1, mininterval=0)
-            print 'bar <<<<<<<<'
+            assert t.pos == 0
             for i in tqdm(_range(3), file=our_file, smoothing=1, leave=True,
                           miniters=1, mininterval=0):
                 if i == 0:
@@ -629,18 +631,18 @@ def test_nested():
     res = [m[0] for m in RE_nested.findall(out)]
     assert res == ['\router loop:   0%',
                    '\n\rinner loop:   0%',
-                   '\rinner loop:  25%',
-                   '\rinner loop:  50%',
-                   '\rinner loop:  75%',
-                   '\rinner loop: 100%',
-                   '\r      ',
+                   '\x1b[A\n\rinner loop:  25%',
+                   '\x1b[A\n\rinner loop:  50%',
+                   '\x1b[A\n\rinner loop:  75%',
+                   '\x1b[A\n\rinner loop: 100%',
+                   '\x1b[A\n\r      ',
                    '\r\x1b[A\router loop:  50%',
                    '\n\rinner loop:   0%',
-                   '\rinner loop:  25%',
-                   '\rinner loop:  50%',
-                   '\rinner loop:  75%',
-                   '\rinner loop: 100%',
-                   '\r      ',
+                   '\x1b[A\n\rinner loop:  25%',
+                   '\x1b[A\n\rinner loop:  50%',
+                   '\x1b[A\n\rinner loop:  75%',
+                   '\x1b[A\n\rinner loop: 100%',
+                   '\x1b[A\n\r      ',
                    '\r\x1b[A\router loop: 100%',
                    '\n']
 
@@ -657,17 +659,17 @@ def test_nested():
     res = [m[0] for m in RE_nested.findall(out)]
     assert res == ['\router loop:   0%',
                    '\n\rinner loop:   0%',
-                   '\rinner loop:  25%',
-                   '\rinner loop:  50%',
-                   '\rinner loop:  75%',
-                   '\rinner loop: 100%',
-                   '\r\x1b[A\router loop:  50%',
+                   '\x1b[A\n\rinner loop:  25%',
+                   '\x1b[A\n\rinner loop:  50%',
+                   '\x1b[A\n\rinner loop:  75%',
+                   '\x1b[A\n\rinner loop: 100%',
+                   '\x1b[A\n\n\x1b[A\x1b[A\router loop:  50%',
                    '\n\rinner loop:   0%',
-                   '\rinner loop:  25%',
-                   '\rinner loop:  50%',
-                   '\rinner loop:  75%',
-                   '\rinner loop: 100%',
-                   '\r\x1b[A\router loop: 100%',
+                   '\x1b[A\n\rinner loop:  25%',
+                   '\x1b[A\n\rinner loop:  50%',
+                   '\x1b[A\n\rinner loop:  75%',
+                   '\x1b[A\n\rinner loop: 100%',
+                   '\x1b[A\n\n\x1b[A\x1b[A\router loop: 100%',
                    '\n']
 
     # Test 2 nested loops with leave
@@ -686,25 +688,25 @@ def test_nested():
     res = [m[0] for m in RE_nested2.findall(out)]
     assert res == ['\router0 loop:   0%',
                    '\n\rinner1 loop:   0%',
-                   '\n\rinner2 loop:   0%',
-                   '\rinner2 loop:  50%',
-                   '\rinner2 loop: 100%',
-                   '\r\x1b[A\rinner1 loop:  50%',
-                   '\n\rinner2 loop:   0%',
-                   '\rinner2 loop:  50%',
-                   '\rinner2 loop: 100%',
-                   '\r\x1b[A\rinner1 loop: 100%',
-                   '\r\x1b[A\router0 loop:  50%',
+                   '\x1b[A\n\n\rinner2 loop:   0%',
+                   '\x1b[A\x1b[A\n\n\rinner2 loop:  50%',
+                   '\x1b[A\x1b[A\n\n\rinner2 loop: 100%',
+                   '\x1b[A\x1b[A\n\n\n\x1b[A\x1b[A\x1b[A\n\rinner1 loop:  50%',
+                   '\x1b[A\n\n\rinner2 loop:   0%',
+                   '\x1b[A\x1b[A\n\n\rinner2 loop:  50%',
+                   '\x1b[A\x1b[A\n\n\rinner2 loop: 100%',
+                   '\x1b[A\x1b[A\n\n\n\x1b[A\x1b[A\x1b[A\n\rinner1 loop: 100%',
+                   '\x1b[A\n\n\x1b[A\x1b[A\router0 loop:  50%',
                    '\n\rinner1 loop:   0%',
-                   '\n\rinner2 loop:   0%',
-                   '\rinner2 loop:  50%',
-                   '\rinner2 loop: 100%',
-                   '\r\x1b[A\rinner1 loop:  50%',
-                   '\n\rinner2 loop:   0%',
-                   '\rinner2 loop:  50%',
-                   '\rinner2 loop: 100%',
-                   '\r\x1b[A\rinner1 loop: 100%',
-                   '\r\x1b[A\router0 loop: 100%',
+                   '\x1b[A\n\n\rinner2 loop:   0%',
+                   '\x1b[A\x1b[A\n\n\rinner2 loop:  50%',
+                   '\x1b[A\x1b[A\n\n\rinner2 loop: 100%',
+                   '\x1b[A\x1b[A\n\n\n\x1b[A\x1b[A\x1b[A\n\rinner1 loop:  50%',
+                   '\x1b[A\n\n\rinner2 loop:   0%',
+                   '\x1b[A\x1b[A\n\n\rinner2 loop:  50%',
+                   '\x1b[A\x1b[A\n\n\rinner2 loop: 100%',
+                   '\x1b[A\x1b[A\n\n\n\x1b[A\x1b[A\x1b[A\n\rinner1 loop: 100%',
+                   '\x1b[A\n\n\x1b[A\x1b[A\router0 loop: 100%',
                    '\n']
     # TODO: test degradation on windows without colorama?
 
@@ -764,7 +766,6 @@ def test_position():
                    '\x1b[A\x1b[A\n\n\r      ',
                    '\r\x1b[A\x1b[A']
 
-
     # Test iteration-based tqdm positioning
     our_file = StringIO()
     for i in trange(2, file=our_file, miniters=1, mininterval=0,
@@ -810,11 +811,11 @@ def test_position():
     # Test manual tqdm positioning
     our_file = StringIO()
     t1 = tqdm(total=2, file=our_file, miniters=1, mininterval=0,
-                maxinterval=0, desc='pos0 bar', position=0)
+              maxinterval=0, desc='pos0 bar', position=0)
     t2 = tqdm(total=2, file=our_file, miniters=1, mininterval=0,
-                maxinterval=0, desc='pos1 bar', position=1)
+              maxinterval=0, desc='pos1 bar', position=1)
     t3 = tqdm(total=2, file=our_file, miniters=1, mininterval=0,
-                maxinterval=0, desc='pos2 bar', position=2)
+              maxinterval=0, desc='pos2 bar', position=2)
     for i in _range(2):
         t1.update()
         t3.update()
@@ -870,3 +871,24 @@ def test_no_gui():
 
         t = tqdm(total=1, gui=False, file=our_file)
         assert hasattr(t, "sp")
+
+
+def test_cmp():
+    """ Tests comparison functions """
+    t0 = tqdm(total=10)
+    t1 = tqdm(total=10)
+    t2 = tqdm(total=10)
+
+    assert t0 < t1
+    assert t2 >= t0
+    assert t0 <= t2
+
+    t3 = tqdm(total=10)
+    t4 = tqdm(total=10)
+    t5 = tqdm(total=10)
+    t5.close()
+    t6 = tqdm(total=10)
+
+    assert t3 != t4
+    assert t3 > t2
+    assert t5 == t6

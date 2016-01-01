@@ -64,9 +64,9 @@ def test_format_meter():
         unich = chr
 
     assert format_meter(0, 1000, 13) == \
-        "  0%|          | 0/1000 [00:13<?,  0.00it/s]"
+        "  0%|          | 0/1000 [00:13<?, ?it/s]"
     assert format_meter(0, 1000, 13, ncols=68, prefix='desc: ') == \
-        "desc:   0%|                            | 0/1000 [00:13<?,  0.00it/s]"
+        "desc:   0%|                                | 0/1000 [00:13<?, ?it/s]"
     assert format_meter(231, 1000, 392) == \
         " 23%|" + unich(0x2588) * 2 + unich(0x258e) + \
         "       | 231/1000 [06:32<21:44,  1.70s/it]"

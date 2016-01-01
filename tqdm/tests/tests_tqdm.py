@@ -586,7 +586,7 @@ def test_smoothing():
 
 def test_nested():
     """ Test nested progress bars """
-    # Use regexp because the it rates can change
+    # Use regexp to break tqdm's output at each printing iteration
     RE_nested = re.compile(r'((\x1b\[A|\r|\n)+((outer|inner) loop:\s+\d+%|\s{3,6})?)')  # NOQA
     RE_nested2 = re.compile(r'((\x1b\[A|\r|\n)+((outer0|inner1|inner2) loop:\s+\d+%|\s{3,6})?)')  # NOQA
 
@@ -600,7 +600,6 @@ def test_nested():
     our_file.seek(0)
     out = our_file.read()
     res = [m[0] for m in RE_nested.findall(out)]
-    print(res)
     assert res == ['\n\rinner loop:   0%',
                    '\rinner loop:  50%',
                    '\r      ',
